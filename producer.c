@@ -4,20 +4,22 @@
 #include <librdkafka/rdkafka.h>
 #include <pthread.h>
 
-#define NUM_MESSAGES 1000 * 1000 * 1000
+#define NUM_MESSAGES 1000 * 1000 * 100
 #define NUM_THREADS 16
+#define NUM_PARTITIONS 50
 
 
 void *produce_messages(void *args) {
     char errstr[512];
     int * tid = (int *) args;
         rd_kafka_conf_t *conf = rd_kafka_conf_new();
-    rd_kafka_conf_set(conf, "bootstrap.servers", "localhost:9092", errstr, sizeof(errstr));
+    rd_kafka_conf_set(conf, "bootstrap.servers", "localhost:9092,localhost:9093,localhost:9094,,localhost:9095", errstr, sizeof(errstr));
 
-    rd_kafka_conf_set(conf, "compression.codec", "gzip", NULL, 0);
+//    rd_kafka_conf_set(conf, "compression.codec", "gzip", NULL, 0);
 
     // Set the 'batch.num.messages' configuration parameter to '10000'
     rd_kafka_conf_set(conf, "batch.num.messages", "10000", NULL, 0);
+    rd_kafka_conf_set(conf, "acks", "0", errstr, sizeof(errstr));
 
     // Set the 'queue.buffering.max.ms' configuration parameter to '1000'
     rd_kafka_conf_set(conf, "queue.buffering.max.ms", "1000", NULL, 0);
@@ -39,8 +41,8 @@ void *produce_messages(void *args) {
 
     for (int i = 0, j = NUM_MESSAGES / NUM_THREADS; i < j; i++) {
         int num = rand() % 1000000 + 1;
-
-        if (rd_kafka_produce(rkt, *tid, RD_KAFKA_MSG_F_COPY,
+        int part = num % NUM_PARTITIONS;
+        if (rd_kafka_produce(rkt, part, RD_KAFKA_MSG_F_COPY,
                             &num, sizeof(num), NULL, 0, NULL) == -1) {
             fprintf(stderr, "%% Failed to produce to topic %s: %s\n",
                     rd_kafka_topic_name(rkt), rd_kafka_err2str(rd_kafka_last_error()));

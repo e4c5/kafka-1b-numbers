@@ -5,22 +5,18 @@
 #include <librdkafka/rdkafka.h>
 #include <pthread.h>
 
-#define NUM_MESSAGES 1000 * 1000 * 1000
-#define NUM_THREADS 16
-#define BATCH 100
+#define NUM_MESSAGES 1000 * 1000 * 100
+#define NUM_THREADS 50
 
 void * consume_messages(void *args) {
     int * counts = (int *) malloc(sizeof(int) * 1000000);
-    
-    rd_kafka_message_t *messages[BATCH];
-
     memset(counts, 0, sizeof(int) * 1000000);
     char errstr[512];
 
     rd_kafka_conf_t *conf = rd_kafka_conf_new();
 
     // Set the 'bootstrap.servers' configuration parameter
-    rd_kafka_conf_set(conf, "bootstrap.servers", "localhost:9092", errstr, sizeof(errstr));
+    rd_kafka_conf_set(conf, "bootstrap.servers", "localhost:9092,localhost:9093,localhost:9094,localhost:9095", errstr, sizeof(errstr));
     rd_kafka_conf_set(conf, "group.id", "mygroup.2", errstr, sizeof(errstr));
     rd_kafka_conf_set(conf, "auto.offset.reset", "earliest", errstr, sizeof(errstr));
     rd_kafka_t *rk = rd_kafka_new(RD_KAFKA_CONSUMER, conf, errstr, sizeof(errstr));
@@ -42,7 +38,7 @@ void * consume_messages(void *args) {
     }
 
     
-    for(int consumed=0, j=NUM_MESSAGES / NUM_THREADS; consumed < j ; ) {
+    for(int consumed=0, j=NUM_MESSAGES / NUM_THREADS; consumed < j ; consumed++) {
         rd_kafka_message_t *rkmessage;
         rkmessage = rd_kafka_consumer_poll(rk, 1000);
         if (rkmessage) {
