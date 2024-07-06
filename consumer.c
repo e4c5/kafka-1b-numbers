@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <librdkafka/rdkafka.h>
 
-#define NUM_MESSAGES 1000000
+#define NUM_MESSAGES 10000000
 
 int main() {
     char errstr[512];
@@ -14,7 +14,7 @@ int main() {
 
     // Set the 'bootstrap.servers' configuration parameter
     rd_kafka_conf_set(conf, "bootstrap.servers", "localhost:9092", errstr, sizeof(errstr));
-    rd_kafka_conf_set(conf, "group.id", "mygroup", errstr, sizeof(errstr));
+    rd_kafka_conf_set(conf, "group.id", "mygroup.1", errstr, sizeof(errstr));
     rd_kafka_conf_set(conf, "auto.offset.reset", "earliest", errstr, sizeof(errstr));
     rd_kafka_t *rk = rd_kafka_new(RD_KAFKA_CONSUMER, conf, errstr, sizeof(errstr));
 
@@ -42,20 +42,21 @@ int main() {
             
             int num = *(int *)rkmessage->payload;
             counts[num]++;
-            if(consumed % 1000 == 0) {
+            if(consumed % 1000000 == 0) {
                 printf("Consumed %d messages\n", consumed);
             }
-            
+
             rd_kafka_message_destroy(rkmessage);
         }
     }
 
-    // Print the counts
+    FILE * fp = fopen("counts.txt","w");
     for (int i = 0; i < 1000000; i++) {
         if (counts[i] > 0) {
-         //   printf("%d: %d\n", i, counts[i]);
+            fprintf(fp, "%d: %d\n", i, counts[i]);
         }
     }
+    fclose(fp);
 
     printf("Done\n");
     rd_kafka_topic_partition_list_destroy(topics);
