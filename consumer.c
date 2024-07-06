@@ -5,7 +5,7 @@
 #include <librdkafka/rdkafka.h>
 #include <pthread.h>
 
-#define NUM_MESSAGES 1000 * 1000 * 90
+#define NUM_MESSAGES 1000 * 1000 * 1000
 #define NUM_THREADS 50
 
 void * consume_messages(void *args) {
@@ -23,7 +23,7 @@ void * consume_messages(void *args) {
 
     if (rk == NULL) {
         fprintf(stderr, "%% Failed to create new consumer: %s\n", errstr);
-        return 1;
+        return NULL;
     }
 
     rd_kafka_topic_partition_list_t *topics = rd_kafka_topic_partition_list_new(1);
@@ -34,7 +34,7 @@ void * consume_messages(void *args) {
     if (err) {
         fprintf(stderr, "%% Failed to subscribe to %d topics: %s\n",
                 topics->cnt, rd_kafka_err2str(err));
-        return 1;
+        return NULL;
     }
 
     

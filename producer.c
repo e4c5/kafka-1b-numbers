@@ -4,7 +4,7 @@
 #include <librdkafka/rdkafka.h>
 #include <pthread.h>
 
-#define NUM_MESSAGES 1000 * 1000 * 100
+#define NUM_MESSAGES 1000 * 1000 * 1024 
 #define NUM_THREADS 50
 #define NUM_PARTITIONS 50
 #define BATCH_SIZE 1000
