@@ -5,8 +5,9 @@
 #include <pthread.h>
 
 #define NUM_MESSAGES 1000 * 1000 * 100
-#define NUM_THREADS 16
+#define NUM_THREADS 50
 #define NUM_PARTITIONS 50
+#define BATCH_SIZE 1000
 
 
 void *produce_messages(void *args) {
@@ -39,15 +40,22 @@ void *produce_messages(void *args) {
         return NULL;
     }
 
-    for (int i = 0, j = NUM_MESSAGES / NUM_THREADS; i < j; i++) {
-        int num = rand() % 1000000 + 1;
-        int part = num % NUM_PARTITIONS;
+    for (int i = 0, k = NUM_MESSAGES / NUM_THREADS; i < k; i++) {
+        int part = rand() % NUM_PARTITIONS;
+        char batch[BATCH_SIZE * sizeof(int)];
+        int j;
+        for (j = 0; j < BATCH_SIZE && i < NUM_MESSAGES; ++j) {
+            int num = rand() % 1000000 + 1;
+            i++;
+            memcpy(batch + j * sizeof(int), &num, sizeof(int));
+        }
+        
         if (rd_kafka_produce(rkt, part, RD_KAFKA_MSG_F_COPY,
-                            &num, sizeof(num), NULL, 0, NULL) == -1) {
+                            batch, j * sizeof(int), NULL, 0, NULL) == -1) {
             fprintf(stderr, "%% Failed to produce to topic %s: %s\n",
                     rd_kafka_topic_name(rkt), rd_kafka_err2str(rd_kafka_last_error()));
         }
-        if(i % 1000 == 0) {
+        if(i % 100 == 0) {
             rd_kafka_flush(rk, 10*1000);
         }
     }

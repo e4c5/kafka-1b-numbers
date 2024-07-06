@@ -5,7 +5,7 @@
 #include <librdkafka/rdkafka.h>
 #include <pthread.h>
 
-#define NUM_MESSAGES 1000 * 1000 * 100
+#define NUM_MESSAGES 1000 * 1000 * 90
 #define NUM_THREADS 50
 
 void * consume_messages(void *args) {
@@ -17,7 +17,7 @@ void * consume_messages(void *args) {
 
     // Set the 'bootstrap.servers' configuration parameter
     rd_kafka_conf_set(conf, "bootstrap.servers", "localhost:9092,localhost:9093,localhost:9094,localhost:9095", errstr, sizeof(errstr));
-    rd_kafka_conf_set(conf, "group.id", "mygroup.2", errstr, sizeof(errstr));
+    rd_kafka_conf_set(conf, "group.id", "mygroup.1", errstr, sizeof(errstr));
     rd_kafka_conf_set(conf, "auto.offset.reset", "earliest", errstr, sizeof(errstr));
     rd_kafka_t *rk = rd_kafka_new(RD_KAFKA_CONSUMER, conf, errstr, sizeof(errstr));
 
@@ -38,20 +38,24 @@ void * consume_messages(void *args) {
     }
 
     
-    for(int consumed=0, j=NUM_MESSAGES / NUM_THREADS; consumed < j ; consumed++) {
+    for(int consumed=0, j=NUM_MESSAGES / NUM_THREADS; consumed < j ; ) {
         rd_kafka_message_t *rkmessage;
         rkmessage = rd_kafka_consumer_poll(rk, 1000);
         if (rkmessage) {
-            
-            int num = *(int *)rkmessage->payload;
-            counts[num]++;
-            if(consumed % 1000000 == 0) {
-                printf("Consumed %d messages\n", consumed);
+            int *nums = (int *)rkmessage->payload;
+            int num_count = rkmessage->len / sizeof(int);
+            for (int i = 0; i < num_count; ++i) {
+                int num = nums[i];
+                counts[num]++;
+                consumed++;
+                if(consumed % 10000 == 0) {
+                    printf("Consumed %d messages\n", consumed);
+                }
             }
-
             rd_kafka_message_destroy(rkmessage);
         }
     }
+
     rd_kafka_topic_partition_list_destroy(topics);
     rd_kafka_destroy(rk);
 
