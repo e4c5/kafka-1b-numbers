@@ -4,7 +4,7 @@
 #include <librdkafka/rdkafka.h>
 #include <pthread.h>
 
-#define NUM_MESSAGES 10000000
+#define NUM_MESSAGES 1000 * 1000 * 1000
 #define NUM_THREADS 16
 
 
@@ -26,7 +26,7 @@ void *produce_messages(void *args) {
 
     if (rk == NULL) {
         fprintf(stderr, "%% Failed to create new producer: %s\n", errstr);
-        return 1;
+        return NULL;
     }
 
     rd_kafka_topic_t *rkt = rd_kafka_topic_new(rk, "numbers", NULL);
@@ -34,7 +34,7 @@ void *produce_messages(void *args) {
         fprintf(stderr, "%% Failed to create topic object: %s\n",
                 rd_kafka_err2str(rd_kafka_last_error()));
         rd_kafka_destroy(rk);
-        return 1;
+        return NULL;
     }
 
     for (int i = 0, j = NUM_MESSAGES / NUM_THREADS; i < j; i++) {
