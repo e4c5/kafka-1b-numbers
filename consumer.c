@@ -8,6 +8,12 @@
 #define NUM_MESSAGES 1000 * 1000 * 1000
 #define NUM_THREADS 50
 
+/**
+ * Consumes messages from the Kafka topic 'numbers'.
+ * How many times each number is seen will be saved into an integer array. 
+ * When the thread has completed the counts will be returned, where it will
+ * be available to the caller through pthread_join
+ */
 void * consume_messages(void *args) {
     int * counts = (int *) malloc(sizeof(int) * 1000000);
     if(counts == NULL) {
@@ -19,12 +25,14 @@ void * consume_messages(void *args) {
 
     rd_kafka_conf_t *conf = rd_kafka_conf_new();
 
-    // Set the 'bootstrap.servers' configuration parameter
+    // use multiple brokers to increase throughput
     rd_kafka_conf_set(conf, "bootstrap.servers", 
         "localhost:9092,localhost:9093,localhost:9094,localhost:9095,localhost:9096,localhost:9097,localhost:9098",
          errstr, sizeof(errstr));
-    rd_kafka_conf_set(conf, "group.id", "mygroup.6", errstr, sizeof(errstr));
+
+    rd_kafka_conf_set(conf, "group.id", "mygroup.9", errstr, sizeof(errstr));
     rd_kafka_conf_set(conf, "auto.offset.reset", "earliest", errstr, sizeof(errstr));
+    rd_kafka_conf_set(conf, "partition.assignment.strategy", "roundrobin", errstr, sizeof(errstr));
     rd_kafka_t *rk = rd_kafka_new(RD_KAFKA_CONSUMER, conf, errstr, sizeof(errstr));
 
     if (rk == NULL) {
@@ -43,8 +51,10 @@ void * consume_messages(void *args) {
         return NULL;
     }
 
-    
-    for(int consumed=0, j=NUM_MESSAGES / NUM_THREADS; consumed < j ; ) {
+    // this is where the kafka subscription boiler plate ends and the work begins.
+    int missed = 0;
+    int consumed=0;
+    while(1) {
         rd_kafka_message_t *rkmessage;
         rkmessage = rd_kafka_consumer_poll(rk, 1000);
         if (rkmessage) {
@@ -52,23 +62,33 @@ void * consume_messages(void *args) {
             int num_count = rkmessage->len / sizeof(int);
             for (int i = 0; i < num_count; ++i) {
                 int num = nums[i];
-                // if(num > 1000000 || num < 0) {
-                //     printf("MAYDAY %d\n", num);
-                //     return NULL;
-                // }
+                if(num > 1000000 || num < 0) {
+                    printf("MAYDAY %d\n", num);
+                    return NULL;
+                }
                 counts[num]++;
-                consumed++;
                 // if(consumed % 1000000 == 0) {
                 //      printf("Consumed %d messages\n", consumed);
                 // }
             }
+            consumed += num_count;
             rd_kafka_message_destroy(rkmessage);
+            missed = 0;
+        }
+        else {
+            missed++;
+            if(missed == 6) {
+                // looks like this partition is exhuasted
+                //printf("Exhuasted\n");
+                break;
+            }
         }
     }
 
     rd_kafka_topic_partition_list_destroy(topics);
     rd_kafka_destroy(rk);
 
+    printf("I ate %d numbers\n", consumed);
     pthread_exit(counts);
     return NULL;
 }
@@ -87,7 +107,7 @@ int main() {
         }
     }
 
-
+    // Wait for all threads to complete and merge their results
     for(int t=0; t<NUM_THREADS; t++){
         pthread_join(threads[t], (void **) &result);
         for(int i = 0 ; i < 1000000 ; i++){
