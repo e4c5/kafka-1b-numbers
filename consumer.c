@@ -8,6 +8,8 @@
 #define NUM_MESSAGES 1000 * 1000 * 1000
 #define NUM_THREADS 50
 
+pthread_barrier_t barrier;
+
 /**
  * Consumes messages from the Kafka topic 'numbers'.
  * How many times each number is seen will be saved into an integer array. 
@@ -30,9 +32,8 @@ void * consume_messages(void *args) {
         "localhost:9092,localhost:9093,localhost:9094,localhost:9095,localhost:9096,localhost:9097,localhost:9098",
          errstr, sizeof(errstr));
 
-    rd_kafka_conf_set(conf, "group.id", "mygroup.9", errstr, sizeof(errstr));
+    rd_kafka_conf_set(conf, "group.id", "mygroup.17", errstr, sizeof(errstr));
     rd_kafka_conf_set(conf, "auto.offset.reset", "earliest", errstr, sizeof(errstr));
-    rd_kafka_conf_set(conf, "partition.assignment.strategy", "roundrobin", errstr, sizeof(errstr));
     rd_kafka_t *rk = rd_kafka_new(RD_KAFKA_CONSUMER, conf, errstr, sizeof(errstr));
 
     if (rk == NULL) {
@@ -50,6 +51,10 @@ void * consume_messages(void *args) {
                 topics->cnt, rd_kafka_err2str(err));
         return NULL;
     }
+
+    // wait until everyone is ready. That way we are able to cut down on a lot of 
+    // rebalancing
+    pthread_barrier_wait(&barrier);
 
     // this is where the kafka subscription boiler plate ends and the work begins.
     int missed = 0;
@@ -88,7 +93,7 @@ void * consume_messages(void *args) {
     rd_kafka_topic_partition_list_destroy(topics);
     rd_kafka_destroy(rk);
 
-    printf("I ate %d numbers\n", consumed);
+    // printf("I ate %d numbers\n", consumed);
     pthread_exit(counts);
     return NULL;
 }
@@ -98,6 +103,7 @@ int main() {
     int *result;
     pthread_t threads[NUM_THREADS];
 
+    pthread_barrier_init(&barrier, NULL, NUM_THREADS);
 
     for(int t=0; t<NUM_THREADS; t++){
         int rc = pthread_create(&threads[t], NULL, consume_messages, NULL);
