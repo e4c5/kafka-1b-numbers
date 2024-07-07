@@ -10,14 +10,20 @@
 
 void * consume_messages(void *args) {
     int * counts = (int *) malloc(sizeof(int) * 1000000);
+    if(counts == NULL) {
+        printf("Could not allocate memory\n");
+        return NULL;
+    }
     memset(counts, 0, sizeof(int) * 1000000);
     char errstr[512];
 
     rd_kafka_conf_t *conf = rd_kafka_conf_new();
 
     // Set the 'bootstrap.servers' configuration parameter
-    rd_kafka_conf_set(conf, "bootstrap.servers", "localhost:9092,localhost:9093,localhost:9094,localhost:9095", errstr, sizeof(errstr));
-    rd_kafka_conf_set(conf, "group.id", "mygroup.1", errstr, sizeof(errstr));
+    rd_kafka_conf_set(conf, "bootstrap.servers", 
+        "localhost:9092,localhost:9093,localhost:9094,localhost:9095,localhost:9096,localhost:9097,localhost:9098",
+         errstr, sizeof(errstr));
+    rd_kafka_conf_set(conf, "group.id", "mygroup.6", errstr, sizeof(errstr));
     rd_kafka_conf_set(conf, "auto.offset.reset", "earliest", errstr, sizeof(errstr));
     rd_kafka_t *rk = rd_kafka_new(RD_KAFKA_CONSUMER, conf, errstr, sizeof(errstr));
 
@@ -46,11 +52,15 @@ void * consume_messages(void *args) {
             int num_count = rkmessage->len / sizeof(int);
             for (int i = 0; i < num_count; ++i) {
                 int num = nums[i];
+                // if(num > 1000000 || num < 0) {
+                //     printf("MAYDAY %d\n", num);
+                //     return NULL;
+                // }
                 counts[num]++;
                 consumed++;
-                if(consumed % 10000 == 0) {
-                    printf("Consumed %d messages\n", consumed);
-                }
+                // if(consumed % 1000000 == 0) {
+                //      printf("Consumed %d messages\n", consumed);
+                // }
             }
             rd_kafka_message_destroy(rkmessage);
         }
@@ -83,6 +93,7 @@ int main() {
         for(int i = 0 ; i < 1000000 ; i++){
             counts[i] += ((int *)result)[i];
         }
+        free(result);
     }
 
     FILE * fp = fopen("counts.txt","w");

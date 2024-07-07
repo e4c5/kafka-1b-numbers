@@ -4,17 +4,19 @@
 #include <librdkafka/rdkafka.h>
 #include <pthread.h>
 
-#define NUM_MESSAGES 1000 * 1000 * 1024 
-#define NUM_THREADS 50
+#define NUM_MESSAGES 1000 * 1000 * 1000
+#define NUM_THREADS 4
 #define NUM_PARTITIONS 50
-#define BATCH_SIZE 1000
+#define BATCH_SIZE 10000
 
 
 void *produce_messages(void *args) {
     char errstr[512];
+    int batch[BATCH_SIZE];
+
     int * tid = (int *) args;
         rd_kafka_conf_t *conf = rd_kafka_conf_new();
-    rd_kafka_conf_set(conf, "bootstrap.servers", "localhost:9092,localhost:9093,localhost:9094,,localhost:9095", errstr, sizeof(errstr));
+    rd_kafka_conf_set(conf, "bootstrap.servers", "localhost:9092,localhost:9093,localhost:9094,localhost:9095,localhost:9096,localhost:9097,localhost:9098", errstr, sizeof(errstr));
 
 //    rd_kafka_conf_set(conf, "compression.codec", "gzip", NULL, 0);
 
@@ -40,22 +42,24 @@ void *produce_messages(void *args) {
         return NULL;
     }
 
-    for (int i = 0, k = NUM_MESSAGES / NUM_THREADS; i < k; i++) {
+    for (int i = 0, k = NUM_MESSAGES / NUM_THREADS, flush =0; i < k;) {
         int part = rand() % NUM_PARTITIONS;
-        char batch[BATCH_SIZE * sizeof(int)];
         int j;
-        for (j = 0; j < BATCH_SIZE && i < NUM_MESSAGES; ++j) {
-            int num = rand() % 1000000 + 1;
-            i++;
-            memcpy(batch + j * sizeof(int), &num, sizeof(int));
+        for (j = 0; j < BATCH_SIZE; ++j) {
+            batch[j] = rand() % 1000000 + 1;
+            if(batch[j] < 0 || batch[j] > 1000000) {
+                printf("WTF %d\n", batch[j]);
+            }
         }
-        
+        i += j;
         if (rd_kafka_produce(rkt, part, RD_KAFKA_MSG_F_COPY,
                             batch, j * sizeof(int), NULL, 0, NULL) == -1) {
             fprintf(stderr, "%% Failed to produce to topic %s: %s\n",
                     rd_kafka_topic_name(rkt), rd_kafka_err2str(rd_kafka_last_error()));
         }
-        if(i % 100 == 0) {
+        flush++;
+        if(flush == 200) {
+            flush = 0;
             rd_kafka_flush(rk, 10*1000);
         }
     }
